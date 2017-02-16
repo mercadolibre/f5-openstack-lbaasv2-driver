@@ -111,6 +111,7 @@ class LBaaSv2ServiceBuilder(object):
                               loadbalancer.tenant_id,
                               network['id'],
                               network['tenant_id']))
+                raise f5_exc.F5MismatchedTenants()
 
             # Get the network VTEPs if the network provider type is
             # either gre or vxlan.
@@ -145,8 +146,8 @@ class LBaaSv2ServiceBuilder(object):
     @log_helpers.log_method_call
     def _get_extended_member(self, context, member):
         """Get extended member attributes and member networking."""
-        member_dict = member.to_dict(pool=False)
-        subnet_id = member.subnet_id
+        member_dict = member
+        subnet_id = member['subnet_id']
         subnet = self._get_subnet_cached(
             context,
             subnet_id
@@ -160,25 +161,25 @@ class LBaaSv2ServiceBuilder(object):
         member_dict['network_id'] = network_id
 
         # Use the fixed ip.
-        filter = {'fixed_ips': {'subnet_id': [subnet_id],
-                                'ip_address': [member.address]}}
-        ports = self.plugin.db._core_plugin.get_ports(
-            context,
-            filter
-        )
-
+        #filter = {'fixed_ips': {'subnet_id': [subnet_id],
+        #                       'ip_address': [member.address]}}
+        #ports = self.plugin.db._core_plugin.get_ports(
+        #    context,
+        #    filter
+        #)
+        member_dict['port'] = None
         # There should be only one.
-        if len(ports) == 1:
-            member_dict['port'] = ports[0]
-            self._populate_member_network(context, member_dict, network)
-        else:
+        #if len(ports) == 1:
+        #    member_dict['port'] = ports[0]
+        #    self._populate_member_network(context, member_dict, network)
+        #else:
             # FIXME(RJB: raise an exception here and let the driver handle
             # the port that is not on the network.
-            LOG.error("Unexpected number of ports returned for member: ")
-            if not ports:
-                LOG.error("No port found")
-            else:
-                LOG.error("Multiple ports found: %s" % ports)
+        #    LOG.error("Unexpected number of ports returned for member: ")
+        #    if not ports:
+        #        LOG.error("No port found")
+        #    else:
+        #        LOG.error("Multiple ports found: %s" % ports)
 
         return (member_dict, subnet, network)
 
@@ -463,11 +464,15 @@ class LBaaSv2ServiceBuilder(object):
     def _get_members(self, context, pools, subnet_map, network_map):
         pool_members = []
         if pools:
-            members = self.plugin.db.get_pool_members(
+            LOG.debug('################  before self.plugin.db.get_pool_members')
+            #members = self.plugin.db.get_pool_members(
+            members = self.plugin.db.get_pool_members_by_pabloncio(
                 context,
                 filters={'pool_id': [p['id'] for p in pools]}
             )
-
+            LOG.debug('################  after self.plugin.db.get_pool_members')
+            LOG.debug('################  before self._get_extended_member')
+            LOG.debug('################ first member_dict: ' + str(members[0]))    
             for member in members:
                 # Get extended member attributes, network, and subnet.
                 member_dict, subnet, network = (
@@ -477,7 +482,8 @@ class LBaaSv2ServiceBuilder(object):
                 subnet_map[subnet['id']] = subnet
                 network_map[network['id']] = network
                 pool_members.append(member_dict)
-
+            LOG.debug('################ after self._get_extended_member')
+            LOG.debug('################ first pool_member_dict: ' + str(pool_members[0]))
         return pool_members
 
     @log_helpers.log_method_call
