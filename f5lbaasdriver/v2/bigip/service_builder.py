@@ -464,15 +464,11 @@ class LBaaSv2ServiceBuilder(object):
     def _get_members(self, context, pools, subnet_map, network_map):
         pool_members = []
         if pools:
-            LOG.debug('################  before self.plugin.db.get_pool_members')
             #members = self.plugin.db.get_pool_members(
             members = self.plugin.db.get_pool_members_by_pabloncio(
                 context,
                 filters={'pool_id': [p['id'] for p in pools]}
             )
-            LOG.debug('################  after self.plugin.db.get_pool_members')
-            LOG.debug('################  before self._get_extended_member')
-            LOG.debug('################ first member_dict: ' + str(members[0]))    
             for member in members:
                 # Get extended member attributes, network, and subnet.
                 member_dict, subnet, network = (
@@ -482,8 +478,6 @@ class LBaaSv2ServiceBuilder(object):
                 subnet_map[subnet['id']] = subnet
                 network_map[network['id']] = network
                 pool_members.append(member_dict)
-            LOG.debug('################ after self._get_extended_member')
-            LOG.debug('################ first pool_member_dict: ' + str(pool_members[0]))
         return pool_members
 
     @log_helpers.log_method_call
